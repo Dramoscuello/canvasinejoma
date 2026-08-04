@@ -32,6 +32,9 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://canvas_admin:super_secret_password@db:5432/canva_inejoma
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      JWT_SECRET: ${JWT_SECRET:-canva_inejoma_super_secret_jwt_key_2026}
       RUST_LOG: info
       PORT: 8000
     ports:

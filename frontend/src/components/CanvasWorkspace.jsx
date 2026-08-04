@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import * as fabric from 'fabric';
 
 const CanvasWorkspace = forwardRef(({
@@ -15,8 +15,27 @@ const CanvasWorkspace = forwardRef(({
   const fabricCanvasRef = useRef(null);
   const isSyncingRef = useRef(false);
 
+  // REF para evitar closure obsoleta del callback onCanvasChange
+  const onCanvasChangeRef = useRef(onCanvasChange);
+  useEffect(() => {
+    onCanvasChangeRef.current = onCanvasChange;
+  }, [onCanvasChange]);
+
   // Estado para el cursor borrador visual circular
   const [eraserCursor, setEraserCursor] = useState({ x: 0, y: 0, visible: false });
+
+  // Función de emitir cambios estable (usa el ref para el callback)
+  const emitChange = useCallback(() => {
+    if (!isTeacher || isSyncingRef.current || !fabricCanvasRef.current) return;
+    try {
+      const json = fabricCanvasRef.current.toJSON();
+      if (onCanvasChangeRef.current) {
+        onCanvasChangeRef.current(json);
+      }
+    } catch (e) {
+      console.error('Error emitiendo cambio de lienzo:', e);
+    }
+  }, [isTeacher]);
 
   // Inicializar Fabric Canvas
   useEffect(() => {
@@ -102,19 +121,7 @@ const CanvasWorkspace = forwardRef(({
       }
     });
 
-    // Transmitir cambios en tiempo real
-    const emitChange = () => {
-      if (!isTeacher || isSyncingRef.current || !fabricCanvasRef.current) return;
-      try {
-        const json = fabricCanvasRef.current.toJSON();
-        if (onCanvasChange) {
-          onCanvasChange(json);
-        }
-      } catch (e) {
-        console.error('Error emitiendo cambio de lienzo:', e);
-      }
-    };
-
+    // Transmitir cambios en tiempo real usando emitChange (referencia estable)
     canvas.on('object:added', emitChange);
     canvas.on('object:modified', emitChange);
     canvas.on('object:removed', emitChange);
@@ -157,7 +164,7 @@ const CanvasWorkspace = forwardRef(({
         console.warn('Error al destruir canvas:', e);
       }
     };
-  }, []);
+  }, [emitChange]);
 
   // Manejar posición del puntero para el Círculo de Borrador
   const handleContainerMouseMove = (e) => {
@@ -337,8 +344,8 @@ const CanvasWorkspace = forwardRef(({
         canvas.clear();
         canvas.backgroundColor = '#ffffff';
         canvas.renderAll();
-        if (onCanvasChange) {
-          onCanvasChange(canvas.toJSON());
+        if (onCanvasChangeRef.current) {
+          onCanvasChangeRef.current(canvas.toJSON());
         }
       } catch (err) {
         console.error('Error al limpiar el lienzo:', err);
