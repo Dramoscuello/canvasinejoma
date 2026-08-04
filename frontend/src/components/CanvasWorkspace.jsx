@@ -151,26 +151,84 @@ const CanvasWorkspace = forwardRef(({
     canvas.on('object:removed', emitChange);
     canvas.on('path:created', emitChange);
 
-    // Zoom con la rueda del ratón (SOLO PROFESOR)
-    if (isTeacher) {
-      canvas.on('mouse:wheel', (opt) => {
-        try {
-          const delta = opt.e.deltaY;
-          let zoom = canvas.getZoom();
-          zoom *= 0.999 ** delta;
+    // --- PINCH TO ZOOM & PANNING CON 2 DEDOS (TÁCTIL MÓVIL) Y RUEDA DEL RATÓN ---
+    let lastTouchDist = 0;
+    let lastTouchCenter = null;
+
+    canvas.on('mouse:down', (opt) => {
+      const touches = opt.e?.touches;
+      if (touches && touches.length === 2) {
+        const t1 = touches[0];
+        const t2 = touches[1];
+        lastTouchDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        lastTouchCenter = {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2
+        };
+      }
+    });
+
+    canvas.on('mouse:move', (opt) => {
+      const touches = opt.e?.touches;
+      if (touches && touches.length === 2 && fabricCanvasRef.current) {
+        opt.e.preventDefault();
+        opt.e.stopPropagation();
+
+        const t1 = touches[0];
+        const t2 = touches[1];
+        const currentDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        const currentCenter = {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2
+        };
+
+        if (lastTouchDist > 0) {
+          const zoomFactor = currentDist / lastTouchDist;
+          let zoom = fabricCanvasRef.current.getZoom() * zoomFactor;
           if (zoom > 5) zoom = 5;
           if (zoom < 0.2) zoom = 0.2;
-          canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
-          opt.e.preventDefault();
-          opt.e.stopPropagation();
+
+          fabricCanvasRef.current.zoomToPoint(currentCenter, zoom);
+
+          if (lastTouchCenter) {
+            const delta = new fabric.Point(
+              currentCenter.x - lastTouchCenter.x,
+              currentCenter.y - lastTouchCenter.y
+            );
+            fabricCanvasRef.current.relativePan(delta);
+          }
+
           if (onZoomChange) onZoomChange(zoom);
-          // Emitir viewport al cambiar zoom
-          emitViewport();
-        } catch (e) {
-          console.warn('Error en zoom:', e);
+          if (isTeacher) emitViewport();
         }
-      });
-    }
+
+        lastTouchDist = currentDist;
+        lastTouchCenter = currentCenter;
+      }
+    });
+
+    canvas.on('mouse:up', () => {
+      lastTouchDist = 0;
+      lastTouchCenter = null;
+    });
+
+    // Zoom con la rueda del ratón (Disponible para profesor y estudiantes)
+    canvas.on('mouse:wheel', (opt) => {
+      try {
+        const delta = opt.e.deltaY;
+        let zoom = canvas.getZoom();
+        zoom *= 0.999 ** delta;
+        if (zoom > 5) zoom = 5;
+        if (zoom < 0.2) zoom = 0.2;
+        canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+        opt.e.preventDefault();
+        opt.e.stopPropagation();
+        if (onZoomChange) onZoomChange(zoom);
+        if (isTeacher) emitViewport();
+      } catch (e) {
+        console.warn('Error en zoom:', e);
+      }
+    });
 
     if (initialData) {
       isSyncingRef.current = true;

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CanvasWorkspace from '../components/CanvasWorkspace';
 import { wsService } from '../services/websocket';
-import { Radio, AlertCircle } from 'lucide-react';
+import { Radio, AlertCircle, ZoomIn, ZoomOut, RotateCcw, Search } from 'lucide-react';
 
 export default function StudentView() {
   const { code } = useParams();
@@ -50,6 +50,24 @@ export default function StudentView() {
     }
   };
 
+  const handleZoomIn = () => {
+    if (canvasRef.current && canvasRef.current.setZoomLevel) {
+      canvasRef.current.setZoomLevel(zoomLevel + 0.2);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (canvasRef.current && canvasRef.current.setZoomLevel) {
+      canvasRef.current.setZoomLevel(Math.max(0.2, zoomLevel - 0.2));
+    }
+  };
+
+  const handleResetZoom = () => {
+    if (canvasRef.current && canvasRef.current.setZoomLevel) {
+      canvasRef.current.setZoomLevel(1);
+    }
+  };
+
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
       {/* Navbar en modo Estudiante */}
@@ -67,8 +85,7 @@ export default function StudentView() {
         style={{
           position: 'absolute',
           bottom: '24px',
-          left: '50%',
-          transform: 'translateX(-50%)',
+          left: '24px',
           zIndex: 1000,
           padding: '8px 18px',
           display: 'flex',
@@ -81,7 +98,7 @@ export default function StudentView() {
         {isActive ? (
           <>
             <Radio size={16} color="#10b981" />
-            <span>Viendo la explicación del profesor en tiempo real (Solo lectura)</span>
+            <span>Viendo en tiempo real (Solo lectura)</span>
           </>
         ) : (
           <>
@@ -89,6 +106,60 @@ export default function StudentView() {
             <span style={{ color: '#fda4af' }}>La clase ha finalizado por el profesor</span>
           </>
         )}
+      </div>
+
+      {/* Control Flotante de Zoom / Lupa para el Estudiante (Móvil y PC) */}
+      <div
+        className="glass-panel animate-fade-in"
+        style={{
+          position: 'absolute',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 1000,
+          padding: '6px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          borderRadius: '12px'
+        }}
+      >
+        <Search size={16} color="var(--primary)" title="Lupa de acercamiento/alejamiento" />
+
+        <button
+          className="glass-button"
+          style={{ padding: '6px 8px', borderRadius: '8px' }}
+          onClick={handleZoomOut}
+          title="Alejar (Zoom Out)"
+        >
+          <ZoomOut size={16} />
+        </button>
+
+        <span
+          className="zoom-text"
+          onClick={handleResetZoom}
+          title="Clic para restablecer zoom al 100%"
+          style={{ fontSize: '0.85rem', fontWeight: 600, minWidth: '42px', textAlign: 'center' }}
+        >
+          {Math.round(zoomLevel * 100)}%
+        </span>
+
+        <button
+          className="glass-button"
+          style={{ padding: '6px 8px', borderRadius: '8px' }}
+          onClick={handleZoomIn}
+          title="Acercar (Zoom In)"
+        >
+          <ZoomIn size={16} />
+        </button>
+
+        <button
+          className="glass-button"
+          style={{ padding: '6px 8px', borderRadius: '8px' }}
+          onClick={handleResetZoom}
+          title="Restablecer vista (100%)"
+        >
+          <RotateCcw size={14} />
+        </button>
       </div>
 
       {/* Espacio de Lienzo en Solo Lectura */}
