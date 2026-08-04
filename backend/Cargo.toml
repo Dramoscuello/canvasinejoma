@@ -18,7 +18,7 @@ bcrypt = "0.15"
 jsonwebtoken = "9.3"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.10", features = ["v4", "serde"] }
-tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-uuid-0_8"] }
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-uuid-1"] }
 bb8 = "0.8"
 bb8-postgres = "0.8"
 dotenvy = "0.15"
