@@ -42,6 +42,7 @@ export default function TeacherDashboard() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyList, setHistoryList] = useState([]);
   const canvasRef = useRef(null);
+  const isFinishingRef = useRef(false);
 
   // Verificar autenticación y restaurar sesión activa si se refrescó la página
   useEffect(() => {
@@ -121,6 +122,7 @@ export default function TeacherDashboard() {
 
   // Guardar estado de sesión activa en localStorage continuamente para resistir F5 / Refresco
   const persistActiveSessionState = (code, title, canvasData) => {
+    if (isFinishingRef.current) return;
     if (!code) return;
     const sessionState = {
       code,
@@ -281,6 +283,8 @@ export default function TeacherDashboard() {
       '¿Finalizar la Clase Actual?',
       'Al finalizar la clase, el código de 4 caracteres quedará inhabilitado para los estudiantes.',
       async () => {
+        isFinishingRef.current = true;
+
         const currentCode = roomCode;
         const currentTitle = sessionTitle;
         const canvasData = canvasRef.current?.toJSON?.();
@@ -324,6 +328,8 @@ export default function TeacherDashboard() {
         if (canvasRef.current && canvasRef.current.clearAll) {
           canvasRef.current.clearAll();
         }
+
+        isFinishingRef.current = false;
 
         showAlert('Sesión Finalizada', 'La clase ha finalizado exitosamente. El código de acceso ha quedado inhabilitado.', 'info');
       },
