@@ -1,0 +1,32 @@
+[package]
+name = "canva_inejoma_backend"
+version = "0.1.0"
+edition = "2021"
+default-run = "canva_inejoma_backend"
+
+[dependencies]
+axum = { version = "0.7", features = ["ws", "macros"] }
+tokio = { version = "1.38", features = ["full"] }
+futures-util = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rand = "0.8"
+bcrypt = "0.15"
+jsonwebtoken = "9.3"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-uuid-0_8"] }
+bb8 = "0.8"
+bb8-postgres = "0.8"
+dotenvy = "0.15"
+
+[[bin]]
+name = "canva_inejoma_backend"
+path = "src/main.rs"
+
+[[bin]]
+name = "seed"
+path = "src/bin/seed.rs"

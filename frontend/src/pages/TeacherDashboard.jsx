@@ -1,0 +1,270 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Navbar from '../components/Navbar';
+import Toolbar from '../components/Toolbar';
+import CanvasWorkspace from '../components/CanvasWorkspace';
+import HistoryDrawer from '../components/HistoryDrawer';
+import { generate4CharRoomCode } from '../utils/codeGenerator';
+import { wsService } from '../services/websocket';
+import { Sparkles, Play, BookOpen } from 'lucide-react';
+
+export default function TeacherDashboard() {
+  const navigate = useNavigate();
+  const [sessionTitle, setSessionTitle] = useState('');
+  const [roomCode, setRoomCode] = useState(null);
+  const [isActive, setIsActive] = useState(false);
+  const [showStartModal, setShowStartModal] = useState(true);
+  const [spectatorCount, setSpectatorCount] = useState(0);
+
+  // Herramientas del Lienzo
+  const [activeTool, setActiveTool] = useState('pencil');
+  const [color, setColor] = useState('#0f172a');
+  const [brushSize, setBrushSize] = useState(4);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  // Historial
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyList, setHistoryList] = useState([]);
+  const canvasRef = useRef(null);
+
+  // Verificar autenticación
+  useEffect(() => {
+    const token = localStorage.getItem('canva_admin_token');
+    if (!token) {
+      navigate('/login');
+    }
+
+    // Cargar historial local existente
+    const savedHistory = localStorage.getItem('canva_history');
+    if (savedHistory) {
+      try {
+        setHistoryList(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error('Error cargando historial:', e);
+      }
+    }
+  }, [navigate]);
+
+  // Escuchar número de estudiantes conectados en tiempo real por WebSocket
+  useEffect(() => {
+    const unsubscribe = wsService.subscribe((message) => {
+      if (message.type === 'SPECTATOR_COUNT' && typeof message.count === 'number') {
+        setSpectatorCount(message.count);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Cerrar Sesión con Confirmación
+  const handleLogout = () => {
+    if (window.confirm('¿Estás seguro de que deseas cerrar la sesión de administrador?')) {
+      localStorage.removeItem('canva_admin_token');
+      localStorage.removeItem('canva_admin_user');
+      wsService.disconnect();
+      navigate('/login');
+    }
+  };
+
+  // Abrir Modal para Iniciar una Nueva Clase
+  const handleStartNewClass = () => {
+    setSessionTitle('');
+    setRoomCode(null);
+    setIsActive(false);
+    setSpectatorCount(0);
+    setShowStartModal(true);
+    if (canvasRef.current && canvasRef.current.clearAll) {
+      canvasRef.current.clearAll();
+    }
+  };
+
+  // Iniciar Sesión de Lienzo
+  const handleStartCanvas = (e) => {
+    e?.preventDefault();
+    if (!sessionTitle.trim()) return;
+
+    const code = generate4CharRoomCode();
+    setRoomCode(code);
+    setIsActive(true);
+    setSpectatorCount(0);
+    setShowStartModal(false);
+
+    // Conectar WebSocket en modo profesor
+    wsService.connect(code, true);
+  };
+
+  // Transmitir Cambios en el Canvas por WebSocket
+  const handleCanvasChange = (canvasJSON) => {
+    if (roomCode && isActive) {
+      wsService.sendCanvasUpdate(canvasJSON);
+    }
+  };
+
+  // Guardar Sesión en Historial y BD con el número de espectadores actual
+  const handleSaveSession = () => {
+    if (!roomCode) return;
+    const canvasData = canvasRef.current?.toJSON?.();
+
+    const newRecord = {
+      id: Date.now().toString(),
+      title: sessionTitle,
+      code: roomCode,
+      is_active: isActive,
+      spectators_count: spectatorCount,
+      canvas_data: canvasData,
+      created_at: new Date().toISOString()
+    };
+
+    const updatedHistory = [newRecord, ...historyList.filter((h) => h.code !== roomCode)];
+    setHistoryList(updatedHistory);
+    localStorage.setItem('canva_history', JSON.stringify(updatedHistory));
+    alert(`¡Clase "${sessionTitle}" guardada con éxito! (Alumnos: ${spectatorCount})`);
+  };
+
+  // Exportar Imagen PNG
+  const handleExportImage = () => {
+    if (canvasRef.current && canvasRef.current.exportPNG) {
+      canvasRef.current.exportPNG();
+    }
+  };
+
+  // Finalizar Sesión (Invalida el código de 4 caracteres)
+  const handleFinishSession = () => {
+    if (!window.confirm('¿Estás seguro de finalizar la clase? El código de 4 caracteres quedará inservible para los estudiantes.')) {
+      return;
+    }
+
+    handleSaveSession();
+    setIsActive(false);
+    wsService.disconnect();
+    alert('La sesión ha finalizado. El código de acceso ha quedado inhabilitado.');
+  };
+
+  // Reabrir clase del historial
+  const handleLoadClassFromHistory = (item) => {
+    setSessionTitle(item.title);
+    setRoomCode(item.code);
+    setIsActive(false);
+    setSpectatorCount(item.spectators_count || 0);
+    setShowStartModal(false);
+    setIsHistoryOpen(false);
+
+    if (canvasRef.current && canvasRef.current.loadRemoteJSON) {
+      canvasRef.current.loadRemoteJSON(item.canvas_data);
+    }
+  };
+
+  return (
+    <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
+      {/* Navbar Superior */}
+      <Navbar
+        sessionTitle={sessionTitle}
+        roomCode={roomCode}
+        isActive={isActive}
+        isTeacher={true}
+        spectatorCount={spectatorCount}
+        onSaveSession={handleSaveSession}
+        onExportImage={handleExportImage}
+        onFinishSession={handleFinishSession}
+        onOpenHistory={() => setIsHistoryOpen(true)}
+        onStartNewClass={handleStartNewClass}
+        onLogout={handleLogout}
+      />
+
+      {/* Espacio del Lienzo */}
+      <CanvasWorkspace
+        activeTool={activeTool}
+        color={color}
+        brushSize={brushSize}
+        isTeacher={true}
+        onCanvasChange={handleCanvasChange}
+        onZoomChange={setZoomLevel}
+        ref={canvasRef}
+      />
+
+      {/* Barra de Herramientas Flotante */}
+      {roomCode && (
+        <Toolbar
+          activeTool={activeTool}
+          setActiveTool={setActiveTool}
+          color={color}
+          setColor={setColor}
+          brushSize={brushSize}
+          setBrushSize={setBrushSize}
+          onAddShape={(shape) => canvasRef.current?.addShape?.(shape)}
+          onImageUpload={(base64) => canvasRef.current?.addImage?.(base64)}
+          onClearCanvas={() => canvasRef.current?.clearAll?.()}
+          onDeleteSelected={() => canvasRef.current?.deleteSelected?.()}
+          onZoomIn={() => canvasRef.current?.setZoomLevel?.(zoomLevel + 0.15)}
+          onZoomOut={() => canvasRef.current?.setZoomLevel?.(Math.max(0.2, zoomLevel - 0.15))}
+          onResetZoom={() => canvasRef.current?.setZoomLevel?.(1)}
+          zoomLevel={zoomLevel}
+        />
+      )}
+
+      {/* Modal Iniciar Lienzo */}
+      {showStartModal && (
+        <div className="modal-overlay">
+          <div className="modal-card glass-panel animate-fade-in">
+            <div className="modal-header">
+              <div className="logo-icon">
+                <Sparkles size={24} color="#4f46e5" />
+              </div>
+              <div>
+                <h2 className="modal-title">Iniciar Nuevo Lienzo</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  Ingresa el nombre o tema de la clase para generar el código de 4 caracteres.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleStartCanvas} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 500 }}>
+                  Nombre de la Clase / Tema
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <BookOpen size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-subtle)' }} />
+                  <input
+                    type="text"
+                    className="glass-input"
+                    style={{ paddingLeft: '42px' }}
+                    value={sessionTitle}
+                    onChange={(e) => setSessionTitle(e.target.value)}
+                    placeholder="Ej. Ecuaciones Cuadráticas"
+                    autoFocus
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="glass-button"
+                  onClick={() => setIsHistoryOpen(true)}
+                >
+                  Ver Historial
+                </button>
+                <button type="submit" className="glass-button active">
+                  <Play size={16} /> Iniciar Lienzo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Drawer de Historial de Clases */}
+      <HistoryDrawer
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        historyList={historyList}
+        onLoadClass={handleLoadClassFromHistory}
+        onStartNewClass={handleStartNewClass}
+      />
+    </div>
+  );
+}

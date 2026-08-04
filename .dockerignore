@@ -1,0 +1,26 @@
+# ==================================================
+# DOCKERIGNORE ROOT - CanvaInejoma
+# ==================================================
+
+# Dependencias instaladas localmente y compilaciones
+**/node_modules
+**/target
+**/dist
+**/.cargo
+
+# Archivos de control de versiones y configuraciones locales
+.git
+.gitignore
+.dockerignore
+README.md
+
+# Variables de entorno y credenciales sensibles
+.env
+.env.local
+**/.env
+
+# Logs y caches del SO
+*.log
+.DS_Store
+.vscode
+.idea

@@ -1,0 +1,41 @@
+# ==================================================
+# GITIGNORE ROOT - CanvaInejoma
+# ==================================================
+
+# Archivos de entorno (Credenciales sensibles)
+.env
+.env.local
+.env.*.local
+
+# Node.js & Frontend build outputs
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Rust build outputs
+target/
+backend/target/
+Cargo.lock
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sistema Operativo y Editores de Código
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs y Editores
+.idea/
+.vscode/
+*.swp
+*.swo
+.antigravity/
+.gemini/

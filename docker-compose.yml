@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # 1. Base de Datos PostgreSQL
+  db:
+    image: postgres:15-alpine
+    container_name: canva_db
+    restart: always
+    environment:
+      POSTGRES_USER: canvas_admin
+      POSTGRES_PASSWORD: super_secret_password
+      POSTGRES_DB: canva_inejoma
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canvas_admin -d canva_inejoma"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Servidor Backend en Rust (Axum + WebSockets)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: canva_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://canvas_admin:super_secret_password@db:5432/canva_inejoma
+      RUST_LOG: info
+      PORT: 8000
+    ports:
+      - "8000:8000"
+
+  # 3. Servidor Frontend en React + Nginx Proxy
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: canva_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
