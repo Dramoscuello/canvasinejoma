@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Sparkles, ArrowRight, AlertCircle, KeyRound, UserCheck } from 'lucide-react';
 
 export default function StudentJoin() {
@@ -7,6 +7,13 @@ export default function StudentJoin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.error) {
+      setError(location.state.error);
+    }
+  }, [location]);
 
   const handleJoinClass = async (e) => {
     e.preventDefault();

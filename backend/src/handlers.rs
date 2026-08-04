@@ -141,14 +141,21 @@ pub async fn finish_session_handler(
     let mut sessions = state.db.sessions.lock().await;
     if let Some(session) = sessions.get_mut(&code) {
         session.is_active = false;
-        return (
-            StatusCode::OK,
-            Json(json!({"message": "Sesión finalizada exitosamente"})),
-        );
     }
+
+    // Emitir transmisión SESSION_ENDED a todos los clientes WebSocket de la sala
+    let channels = state.channels.lock().await;
+    if let Some(tx) = channels.get(&code) {
+        let end_msg = json!({
+            "type": "SESSION_ENDED",
+            "roomCode": code
+        }).to_string();
+        let _ = tx.send(end_msg);
+    }
+
     (
-        StatusCode::NOT_FOUND,
-        Json(json!({"error": "Sesión no encontrada"})),
+        StatusCode::OK,
+        Json(json!({"message": "Sesión finalizada exitosamente"})),
     )
 }
 
@@ -190,6 +197,9 @@ async fn handle_socket(
     tx: broadcast::Sender<String>,
     state: AppState,
 ) {
+    let (mut sender, mut receiver) = socket.split();
+    let mut rx = tx.subscribe();
+
     // Si se conecta un estudiante, incrementar el contador de espectadores de la sala
     if !is_teacher {
         let count = {
@@ -219,9 +229,6 @@ async fn handle_socket(
         }).to_string();
         let _ = tx.send(spectator_msg);
     }
-
-    let (mut sender, mut receiver) = socket.split();
-    let mut rx = tx.subscribe();
 
     let send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {

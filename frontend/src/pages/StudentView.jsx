@@ -1,48 +1,111 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CanvasWorkspace from '../components/CanvasWorkspace';
 import { wsService } from '../services/websocket';
-import { Radio, AlertCircle, ZoomIn, ZoomOut, RotateCcw, Search } from 'lucide-react';
+import { Radio, AlertCircle, ZoomIn, ZoomOut, RotateCcw, Search, LogOut } from 'lucide-react';
 
 export default function StudentView() {
   const { code } = useParams();
+  const navigate = useNavigate();
+
   const [sessionTitle, setSessionTitle] = useState('Clase en Vivo');
   const [isActive, setIsActive] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const canvasRef = useRef(null);
+  const [sessionEndedInfo, setSessionEndedInfo] = useState({ isEnded: false, countdown: 5 });
 
+  const canvasRef = useRef(null);
+  const countdownIntervalRef = useRef(null);
+
+  // 1. Verificación inicial de vigencia al cargar o refrescar la página
   useEffect(() => {
     if (!code) return;
 
-    // Conectar WebSocket como Estudiante (Solo Lectura)
+    const verifySessionOnMount = async () => {
+      try {
+        const res = await fetch(`/api/sessions/${code}`);
+        if (!res.ok) {
+          // Si el código no existe (404) o ya expiró (410 GONE), expulsar de inmediato a la pantalla del PIN
+          navigate('/', {
+            replace: true,
+            state: { error: 'No existe una clase activa con el código ingresado o ya ha finalizado.' }
+          });
+          return;
+        }
+
+        const sessionData = await res.json();
+        if (!sessionData.is_active) {
+          navigate('/', {
+            replace: true,
+            state: { error: 'La clase asociada a este código de 4 caracteres ya ha finalizado.' }
+          });
+          return;
+        }
+
+        if (sessionData.title) {
+          setSessionTitle(sessionData.title);
+        }
+      } catch (err) {
+        console.warn('Error verificando la sesión en el servidor:', err);
+      }
+    };
+
+    verifySessionOnMount();
+
+    // 2. Conectar WebSocket como Estudiante (Solo Lectura)
     wsService.connect(code, false);
 
-    // Escuchar actualizaciones del lienzo y viewport desde el profesor
+    // 3. Escuchar actualizaciones del lienzo y finalización en tiempo real
     const unsubscribe = wsService.subscribe((message) => {
       if (message.type === 'CANVAS_UPDATE' && message.data) {
         if (canvasRef.current && canvasRef.current.loadRemoteJSON) {
           canvasRef.current.loadRemoteJSON(message.data);
         }
-        // Aplicar viewport del profesor si viene incluido
         if (message.viewport && canvasRef.current && canvasRef.current.applyViewportTransform) {
           canvasRef.current.applyViewportTransform(message.viewport);
         }
       } else if (message.type === 'VIEWPORT_UPDATE' && message.viewport) {
-        // Sincronizar pan/zoom del profesor sin cambios en el dibujo
         if (canvasRef.current && canvasRef.current.applyViewportTransform) {
           canvasRef.current.applyViewportTransform(message.viewport);
         }
       } else if (message.type === 'SESSION_ENDED') {
         setIsActive(false);
+        triggerSessionEndedCountdown();
       }
     });
 
     return () => {
       unsubscribe();
       wsService.disconnect();
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
     };
-  }, [code]);
+  }, [code, navigate]);
+
+  // Función para iniciar la cuenta regresiva de 5 segundos al finalizar la clase
+  const triggerSessionEndedCountdown = () => {
+    setSessionEndedInfo({ isEnded: true, countdown: 5 });
+
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+    }
+
+    let secondsLeft = 5;
+    countdownIntervalRef.current = setInterval(() => {
+      secondsLeft -= 1;
+      setSessionEndedInfo({ isEnded: true, countdown: secondsLeft });
+
+      if (secondsLeft <= 0) {
+        clearInterval(countdownIntervalRef.current);
+        wsService.disconnect();
+        navigate('/', {
+          replace: true,
+          state: { error: 'La sesión ha finalizado. Ingresa un nuevo código para unirte a otra clase.' }
+        });
+      }
+    }, 1000);
+  };
 
   const handleExportImage = () => {
     if (canvasRef.current && canvasRef.current.exportPNG) {
@@ -103,10 +166,69 @@ export default function StudentView() {
         ) : (
           <>
             <AlertCircle size={16} color="#f43f5e" />
-            <span style={{ color: '#fda4af' }}>La clase ha finalizado por el profesor</span>
+            <span style={{ color: '#dc2626', fontWeight: 600 }}>La clase ha finalizado</span>
           </>
         )}
       </div>
+
+      {/* Modal / Overlay de Redirección en 5 Segundos al Finalizar la Clase */}
+      {sessionEndedInfo.isEnded && (
+        <div className="modal-overlay" style={{ zIndex: 2000 }}>
+          <div
+            className="modal-card glass-panel animate-fade-in"
+            style={{ maxWidth: '440px', padding: '32px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '20px' }}
+          >
+            <div
+              style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                background: '#fef2f2',
+                border: '1px solid #fca5a5',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto'
+              }}
+            >
+              <AlertCircle size={32} color="#dc2626" />
+            </div>
+
+            <div>
+              <h2 className="modal-title" style={{ fontSize: '1.35rem', color: '#0f172a', marginBottom: '8px' }}>
+                Clase Finalizada por el Profesor
+              </h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', lineHeight: '1.5' }}>
+                El docente ha dado por terminada la sesión en vivo. Serás redirigido a la pantalla principal en:
+              </p>
+            </div>
+
+            <div
+              style={{
+                fontFamily: 'var(--font-heading)',
+                fontSize: '3.2rem',
+                fontWeight: 800,
+                color: 'var(--primary)',
+                lineHeight: 1
+              }}
+            >
+              {sessionEndedInfo.countdown}s
+            </div>
+
+            <button
+              className="glass-button active"
+              onClick={() => {
+                if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+                wsService.disconnect();
+                navigate('/', { replace: true });
+              }}
+              style={{ width: '100%', justifyContent: 'center', padding: '12px' }}
+            >
+              <LogOut size={16} /> Ir a Ingresar Código Ahora
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Control Flotante de Zoom / Lupa para el Estudiante (Móvil y PC) */}
       <div
