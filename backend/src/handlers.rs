@@ -113,6 +113,20 @@ pub async fn get_session_handler(
             );
         }
     }
+
+    // Si la sala de transmisión WebSocket está activa en memoria
+    let channels = state.channels.lock().await;
+    if channels.contains_key(&code) {
+        return (
+            StatusCode::OK,
+            Json(json!({
+                "code": code,
+                "is_active": true,
+                "title": "Clase en Vivo"
+            })),
+        );
+    }
+
     (
         StatusCode::NOT_FOUND,
         Json(json!({"error": "Sesión no encontrada"})),

@@ -127,18 +127,37 @@ export default function TeacherDashboard() {
     }
   };
 
-  // Iniciar Sesión de Lienzo
-  const handleStartCanvas = (e) => {
+  // Iniciar Sesión de Lienzo (Registra en Backend y BD)
+  const handleStartCanvas = async (e) => {
     e?.preventDefault();
     if (!sessionTitle.trim()) return;
 
+    try {
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: sessionTitle })
+      });
+
+      if (res.ok) {
+        const session = await res.json();
+        setRoomCode(session.code);
+        setIsActive(true);
+        setSpectatorCount(0);
+        setShowStartModal(false);
+        wsService.connect(session.code, true);
+        return;
+      }
+    } catch (err) {
+      console.warn('Backend API no disponible, usando fallback local:', err);
+    }
+
+    // Fallback local si el servidor REST no responde
     const code = generate4CharRoomCode();
     setRoomCode(code);
     setIsActive(true);
     setSpectatorCount(0);
     setShowStartModal(false);
-
-    // Conectar WebSocket en modo profesor
     wsService.connect(code, true);
   };
 
