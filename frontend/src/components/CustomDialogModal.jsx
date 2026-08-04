@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, CheckCircle2, HelpCircle, Info, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, HelpCircle, Info } from 'lucide-react';
 
 export default function CustomDialogModal({
   isOpen,
@@ -13,6 +13,24 @@ export default function CustomDialogModal({
   onClose
 }) {
   if (!isOpen) return null;
+
+  const handleConfirmClick = () => {
+    if (onConfirm) {
+      onConfirm();
+    } else if (onClose) {
+      onClose();
+    }
+  };
+
+  const handleCancelClick = () => {
+    if (onCancel) {
+      onCancel();
+    } else if (onClose) {
+      onClose();
+    }
+  };
+
+  const isConfirmDialog = Boolean(onCancel);
 
   const getIcon = () => {
     switch (type) {
@@ -28,7 +46,7 @@ export default function CustomDialogModal({
   };
 
   return (
-    <div className="modal-overlay animate-fade-in" onClick={onClose || onCancel}>
+    <div className="modal-overlay animate-fade-in" onClick={handleCancelClick}>
       <div
         className="modal-card glass-panel"
         style={{ maxWidth: '420px', padding: '28px' }}
@@ -60,17 +78,17 @@ export default function CustomDialogModal({
         </div>
 
         <div className="modal-actions" style={{ marginTop: '20px' }}>
-          {type === 'confirm' ? (
+          {isConfirmDialog ? (
             <>
-              <button className="glass-button" onClick={onCancel}>
+              <button className="glass-button" onClick={handleCancelClick}>
                 {cancelText}
               </button>
-              <button className="glass-button active" onClick={onConfirm}>
+              <button className="glass-button active" onClick={handleConfirmClick}>
                 {confirmText}
               </button>
             </>
           ) : (
-            <button className="glass-button active" onClick={onClose || onConfirm}>
+            <button className="glass-button active" onClick={handleConfirmClick}>
               {confirmText}
             </button>
           )}

@@ -59,7 +59,7 @@ export default function TeacherDashboard() {
       }
     }
 
-    // Restaurar clase activa si el docente refrescó la página sin finalizarla
+    // Restaurar clase activa únicamente si existe una clase EN VIVO sin finalizar
     const activeSession = localStorage.getItem('canva_active_session');
     if (activeSession) {
       try {
@@ -120,7 +120,7 @@ export default function TeacherDashboard() {
       message,
       type,
       confirmText: 'Aceptar',
-      onConfirm: () => setDialog((prev) => ({ ...prev, isOpen: false }))
+      onConfirm: null
     });
   };
 
@@ -155,7 +155,7 @@ export default function TeacherDashboard() {
     );
   };
 
-  // Abrir Modal para Iniciar una Nueva Clase
+  // Abrir Modal para Iniciar una Nueva Clase (Limpia el lienzo viejo)
   const handleStartNewClass = () => {
     localStorage.removeItem('canva_active_session');
     setSessionTitle('');
@@ -172,6 +172,11 @@ export default function TeacherDashboard() {
   const handleStartCanvas = async (e) => {
     e?.preventDefault();
     if (!sessionTitle.trim()) return;
+
+    // Limpiar lienzo de dibujos viejos al iniciar clase nueva
+    if (canvasRef.current && canvasRef.current.clearAll) {
+      canvasRef.current.clearAll();
+    }
 
     let finalCode = generate4CharRoomCode();
 
@@ -248,7 +253,7 @@ export default function TeacherDashboard() {
     }
   };
 
-  // Finalizar Sesión (Invalida el código de 4 caracteres en backend y frontend)
+  // Finalizar Sesión (Invalida el código de 4 caracteres en backend y limpia lienzo)
   const handleFinishSession = () => {
     showConfirm(
       '¿Finalizar la Clase Actual?',
@@ -282,14 +287,22 @@ export default function TeacherDashboard() {
         setHistoryList(updatedHistory);
         localStorage.setItem('canva_history', JSON.stringify(updatedHistory));
 
-        // 3. Eliminar la sesión activa de localStorage para que refrescar no la reabra como activa
+        // 3. Eliminar la sesión activa de localStorage
         localStorage.removeItem('canva_active_session');
 
-        // 4. Desconectar WebSocket y cambiar estado a inactivo
+        // 4. Desconectar WebSocket y resetear estado a inactivo
         wsService.disconnect();
+        setRoomCode(null);
         setIsActive(false);
+        setSessionTitle('');
+        setSpectatorCount(0);
+        setShowStartModal(true);
 
-        // 5. Mostrar confirmación visual y abrir Historial de Clases
+        // 5. Limpiar el lienzo
+        if (canvasRef.current && canvasRef.current.clearAll) {
+          canvasRef.current.clearAll();
+        }
+
         showAlert('Sesión Finalizada', 'La clase ha finalizado exitosamente. El código de acceso ha quedado inhabilitado.', 'info');
       },
       'warning'
