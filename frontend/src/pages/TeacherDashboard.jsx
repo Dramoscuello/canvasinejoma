@@ -18,7 +18,7 @@ export default function TeacherDashboard() {
   const [showStartModal, setShowStartModal] = useState(true);
   const [spectatorCount, setSpectatorCount] = useState(0);
   const [isShareOpen, setIsShareOpen] = useState(false);
-  const [wsConnected, setWsConnected] = useState(false);
+  const [wsConnected, setWsConnected] = useState(null);
   const [wsReconnecting, setWsReconnecting] = useState(false);
 
   // Estado para Diálogos Personalizados (Reemplazo de alert y confirm)
@@ -156,7 +156,9 @@ export default function TeacherDashboard() {
       onConfirm: () => {
         setDialog((prev) => ({ ...prev, isOpen: false }));
         onConfirmAction();
-      }
+      },
+      onCancel: () => setDialog((prev) => ({ ...prev, isOpen: false })),
+      onClose: () => setDialog((prev) => ({ ...prev, isOpen: false }))
     });
   };
 
@@ -345,6 +347,13 @@ export default function TeacherDashboard() {
     }
   };
 
+  // Eliminar clase del historial
+  const handleDeleteHistoryItem = (id) => {
+    const updated = historyList.filter((h) => h.id !== id);
+    setHistoryList(updated);
+    localStorage.setItem('canva_history', JSON.stringify(updated));
+  };
+
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
       {/* Navbar Superior */}
@@ -478,6 +487,7 @@ export default function TeacherDashboard() {
         onClose={() => setIsHistoryOpen(false)}
         historyList={historyList}
         onLoadClass={handleLoadClassFromHistory}
+        onDelete={handleDeleteHistoryItem}
         onStartNewClass={handleStartNewClass}
       />
     </div>

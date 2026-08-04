@@ -1,7 +1,7 @@
 import React from 'react';
-import { X, Calendar, Eye, Plus, Users } from 'lucide-react';
+import { X, Calendar, Eye, Plus, Users, Trash2 } from 'lucide-react';
 
-export default function HistoryDrawer({ isOpen, onClose, historyList, onLoadClass, onStartNewClass }) {
+export default function HistoryDrawer({ isOpen, onClose, historyList, onLoadClass, onDelete, onStartNewClass }) {
   if (!isOpen) return null;
 
   return (
@@ -58,6 +58,14 @@ export default function HistoryDrawer({ isOpen, onClose, historyList, onLoadClas
                     onClick={() => onLoadClass(item)}
                   >
                     <Eye size={14} /> Reabrir
+                  </button>
+                  <button
+                    className="glass-button"
+                    style={{ fontSize: '0.8rem', padding: '6px 10px', color: '#dc2626' }}
+                    onClick={() => onDelete && onDelete(item.id)}
+                    title="Eliminar clase del historial"
+                  >
+                    <Trash2 size={14} /> Eliminar
                   </button>
                 </div>
               </div>

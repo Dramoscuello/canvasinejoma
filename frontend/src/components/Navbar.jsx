@@ -82,7 +82,7 @@ export default function Navbar({
                 </span>
               </div>
 
-              {wsConnected !== undefined && (
+              {wsConnected != null && (
                 <div
                   className="spectator-counter-badge"
                   title={
