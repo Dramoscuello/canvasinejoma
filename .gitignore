@@ -15,7 +15,6 @@ frontend/dist/
 # Rust build outputs
 target/
 backend/target/
-Cargo.lock
 
 # Logs
 *.log

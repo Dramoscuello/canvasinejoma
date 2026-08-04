@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/li
 WORKDIR /usr/src/backend
 
 # Copiar manifiesto de dependencias primero (aprovecha cache de Docker)
-COPY Cargo.toml Cargo.lock* ./
+COPY Cargo.toml Cargo.lock ./
 
 # Copiar TODO el código fuente (incluye src/, src/bin/)
 COPY src/ ./src/
