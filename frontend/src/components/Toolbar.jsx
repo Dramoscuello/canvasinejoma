@@ -13,7 +13,8 @@ import {
   Trash2,
   RotateCcw,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Undo2
 } from 'lucide-react';
 
 const PRESET_COLORS = [
@@ -36,6 +37,7 @@ export default function Toolbar({
   setBrushSize,
   onAddShape,
   onImageUpload,
+  onUndo,
   onClearCanvas,
   onDeleteSelected,
   onZoomIn,
@@ -257,7 +259,7 @@ export default function Toolbar({
 
       <div className="toolbar-divider" />
 
-      {/* Control de Zoom & Acciones de Limpieza */}
+      {/* Control de Zoom & Acciones de Limpieza / Deshacer */}
       <div className="tool-group">
         <button className="glass-button" onClick={onZoomOut} title="Alejar Zoom">
           <ZoomOut size={16} />
@@ -267,6 +269,9 @@ export default function Toolbar({
         </span>
         <button className="glass-button" onClick={onZoomIn} title="Acercar Zoom">
           <ZoomIn size={16} />
+        </button>
+        <button className="glass-button" onClick={onUndo} title="Deshacer último cambio (Undo)">
+          <Undo2 size={16} />
         </button>
         <button className="glass-button danger" onClick={onDeleteSelected} title="Eliminar Objeto Seleccionado">
           <Trash2 size={16} />

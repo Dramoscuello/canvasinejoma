@@ -438,6 +438,25 @@ const CanvasWorkspace = forwardRef(({
       }
     },
 
+    undo: () => {
+      const canvas = fabricCanvasRef.current;
+      if (!canvas || !isTeacher) return;
+      try {
+        const objects = canvas.getObjects();
+        if (objects && objects.length > 0) {
+          const lastObj = objects[objects.length - 1];
+          canvas.remove(lastObj);
+          canvas.discardActiveObject();
+          canvas.renderAll();
+          if (onCanvasChangeRef.current) {
+            onCanvasChangeRef.current(canvas.toJSON(), canvas.viewportTransform);
+          }
+        }
+      } catch (err) {
+        console.error('Error al deshacer el último cambio:', err);
+      }
+    },
+
     deleteSelected: () => {
       const canvas = fabricCanvasRef.current;
       if (!canvas || !isTeacher) return;

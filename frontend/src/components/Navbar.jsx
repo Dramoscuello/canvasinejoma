@@ -24,15 +24,20 @@ export default function Navbar({
   onFinishSession,
   onOpenHistory,
   onStartNewClass,
+  onShareOpen,
   onLogout
 }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopyLink = () => {
-    const studentUrl = `${window.location.origin}/r/${roomCode}`;
-    navigator.clipboard.writeText(studentUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    if (onShareOpen) {
+      onShareOpen();
+    } else {
+      const studentUrl = `${window.location.origin}/r/${roomCode}`;
+      navigator.clipboard.writeText(studentUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
   };
 
   return (
@@ -52,7 +57,7 @@ export default function Navbar({
       {roomCode && (
         <div className="session-info">
           <span className="session-title">{sessionTitle || 'Clase Interactiva'}</span>
-          <div className="code-badge" onClick={handleCopyLink} title="Haz clic para copiar el enlace">
+          <div className="code-badge" onClick={handleCopyLink} title="Abrir opciones de compartir enlace">
             <span className="code-label">Código:</span>
             <strong className="code-value">{roomCode}</strong>
             {copied ? <Check size={14} color="#059669" /> : <Copy size={14} />}
@@ -84,9 +89,9 @@ export default function Navbar({
             {/* Si la clase está ACTIVA: herramientas de la sesión en vivo */}
             {roomCode && isActive ? (
               <>
-                <button className="glass-button" onClick={handleCopyLink} title="Compartir Enlace con Estudiantes">
+                <button className="glass-button" onClick={handleCopyLink} title="Ver Enlace y Código para Estudiantes">
                   <Share2 size={16} />
-                  <span className="btn-text">{copied ? 'Copiado!' : 'Compartir'}</span>
+                  <span className="btn-text">Compartir</span>
                 </button>
 
                 <button className="glass-button success" onClick={onSaveSession} title="Guardar estado en Base de Datos">

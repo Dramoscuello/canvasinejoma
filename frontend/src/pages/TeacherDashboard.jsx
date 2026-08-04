@@ -4,6 +4,8 @@ import Navbar from '../components/Navbar';
 import Toolbar from '../components/Toolbar';
 import CanvasWorkspace from '../components/CanvasWorkspace';
 import HistoryDrawer from '../components/HistoryDrawer';
+import ShareModal from '../components/ShareModal';
+import CustomDialogModal from '../components/CustomDialogModal';
 import { generate4CharRoomCode } from '../utils/codeGenerator';
 import { wsService } from '../services/websocket';
 import { Sparkles, Play, BookOpen } from 'lucide-react';
@@ -15,6 +17,18 @@ export default function TeacherDashboard() {
   const [isActive, setIsActive] = useState(false);
   const [showStartModal, setShowStartModal] = useState(true);
   const [spectatorCount, setSpectatorCount] = useState(0);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+
+  // Estado para Diálogos Personalizados (Reemplazo de alert y confirm)
+  const [dialog, setDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+    confirmText: 'Aceptar',
+    cancelText: 'Cancelar',
+    onConfirm: null
+  });
 
   // Herramientas del Lienzo
   const [activeTool, setActiveTool] = useState('pencil');
@@ -58,14 +72,47 @@ export default function TeacherDashboard() {
     };
   }, []);
 
-  // Cerrar Sesión con Confirmación
+  // Helper para mostrar Alerta Personalizada
+  const showAlert = (title, message, type = 'info') => {
+    setDialog({
+      isOpen: true,
+      title,
+      message,
+      type,
+      confirmText: 'Aceptar',
+      onConfirm: () => setDialog((prev) => ({ ...prev, isOpen: false }))
+    });
+  };
+
+  // Helper para mostrar Confirmación Personalizada
+  const showConfirm = (title, message, onConfirmAction, type = 'confirm') => {
+    setDialog({
+      isOpen: true,
+      title,
+      message,
+      type,
+      confirmText: 'Confirmar',
+      cancelText: 'Cancelar',
+      onConfirm: () => {
+        setDialog((prev) => ({ ...prev, isOpen: false }));
+        onConfirmAction();
+      }
+    });
+  };
+
+  // Cerrar Sesión con Confirmación Personalizada
   const handleLogout = () => {
-    if (window.confirm('¿Estás seguro de que deseas cerrar la sesión de administrador?')) {
-      localStorage.removeItem('canva_admin_token');
-      localStorage.removeItem('canva_admin_user');
-      wsService.disconnect();
-      navigate('/login');
-    }
+    showConfirm(
+      '¿Cerrar Sesión de Administrador?',
+      '¿Estás seguro de que deseas cerrar la sesión? Volverás a la pantalla de inicio de sesión.',
+      () => {
+        localStorage.removeItem('canva_admin_token');
+        localStorage.removeItem('canva_admin_user');
+        wsService.disconnect();
+        navigate('/login');
+      },
+      'warning'
+    );
   };
 
   // Abrir Modal para Iniciar una Nueva Clase
@@ -127,7 +174,7 @@ export default function TeacherDashboard() {
     const updatedHistory = [newRecord, ...historyList.filter((h) => h.code !== roomCode)];
     setHistoryList(updatedHistory);
     localStorage.setItem('canva_history', JSON.stringify(updatedHistory));
-    alert(`¡Clase "${sessionTitle}" guardada con éxito! (Alumnos: ${spectatorCount})`);
+    showAlert('¡Clase Guardada!', `La clase "${sessionTitle}" ha sido guardada exitosamente con ${spectatorCount} alumnos.`, 'success');
   };
 
   // Exportar Imagen PNG
@@ -139,14 +186,17 @@ export default function TeacherDashboard() {
 
   // Finalizar Sesión (Invalida el código de 4 caracteres)
   const handleFinishSession = () => {
-    if (!window.confirm('¿Estás seguro de finalizar la clase? El código de 4 caracteres quedará inservible para los estudiantes.')) {
-      return;
-    }
-
-    handleSaveSession();
-    setIsActive(false);
-    wsService.disconnect();
-    alert('La sesión ha finalizado. El código de acceso ha quedado inhabilitado.');
+    showConfirm(
+      '¿Finalizar la Clase Actual?',
+      'Al finalizar la clase, el código de 4 caracteres quedará inhabilitado para los estudiantes.',
+      () => {
+        handleSaveSession();
+        setIsActive(false);
+        wsService.disconnect();
+        showAlert('Sesión Finalizada', 'La clase ha finalizado exitosamente. El código de acceso ha quedado inhabilitado.', 'info');
+      },
+      'warning'
+    );
   };
 
   // Reabrir clase del historial
@@ -177,6 +227,7 @@ export default function TeacherDashboard() {
         onFinishSession={handleFinishSession}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onStartNewClass={handleStartNewClass}
+        onShareOpen={() => setIsShareOpen(true)}
         onLogout={handleLogout}
       />
 
@@ -203,6 +254,7 @@ export default function TeacherDashboard() {
           setBrushSize={setBrushSize}
           onAddShape={(shape) => canvasRef.current?.addShape?.(shape)}
           onImageUpload={(base64) => canvasRef.current?.addImage?.(base64)}
+          onUndo={() => canvasRef.current?.undo?.()}
           onClearCanvas={() => canvasRef.current?.clearAll?.()}
           onDeleteSelected={() => canvasRef.current?.deleteSelected?.()}
           onZoomIn={() => canvasRef.current?.setZoomLevel?.(zoomLevel + 0.15)}
@@ -264,6 +316,27 @@ export default function TeacherDashboard() {
           </div>
         </div>
       )}
+
+      {/* Modal Grande de Compartir Enlace */}
+      <ShareModal
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        roomCode={roomCode}
+        sessionTitle={sessionTitle}
+      />
+
+      {/* Modal de Diálogo Personalizado (Alertas y Confirmaciones) */}
+      <CustomDialogModal
+        isOpen={dialog.isOpen}
+        title={dialog.title}
+        message={dialog.message}
+        type={dialog.type}
+        confirmText={dialog.confirmText}
+        cancelText={dialog.cancelText}
+        onConfirm={dialog.onConfirm}
+        onCancel={() => setDialog((prev) => ({ ...prev, isOpen: false }))}
+        onClose={() => setDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
 
       {/* Drawer de Historial de Clases */}
       <HistoryDrawer
