@@ -167,7 +167,6 @@ class WebSocketService {
     }
 
     this.connected = false;
-    this.listeners.clear();
     this.roomCode = null;
     this.reconnectAttempts = 0;
   }

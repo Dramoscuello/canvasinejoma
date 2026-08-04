@@ -61,13 +61,6 @@ export default function StudentView() {
         if (canvasRef.current && canvasRef.current.loadRemoteJSON) {
           canvasRef.current.loadRemoteJSON(message.data);
         }
-        if (message.viewport && canvasRef.current && canvasRef.current.applyViewportTransform) {
-          canvasRef.current.applyViewportTransform(message.viewport);
-        }
-      } else if (message.type === 'VIEWPORT_UPDATE' && message.viewport) {
-        if (canvasRef.current && canvasRef.current.applyViewportTransform) {
-          canvasRef.current.applyViewportTransform(message.viewport);
-        }
       } else if (message.type === 'SESSION_ENDED') {
         setIsActive(false);
         triggerSessionEndedCountdown();
