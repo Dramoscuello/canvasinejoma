@@ -1,7 +1,7 @@
 # Etapa 1: Construcción
 FROM rust:1.80-alpine AS builder
 
-RUN apk add --no-libc-dev build-base musl-dev
+RUN apk add --no-cache build-base musl-dev
 
 WORKDIR /usr/src/backend
 COPY Cargo.toml ./
