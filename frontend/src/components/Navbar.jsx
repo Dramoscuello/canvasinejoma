@@ -19,6 +19,8 @@ export default function Navbar({
   isActive,
   isTeacher,
   spectatorCount = 0,
+  wsConnected,
+  wsReconnecting,
   onSaveSession,
   onExportImage,
   onFinishSession,
@@ -72,12 +74,49 @@ export default function Navbar({
 
           {/* Contador de Estudiantes Conectados en Tiempo Real */}
           {isTeacher && isActive && (
-            <div className="spectator-counter-badge" title="Estudiantes activos viendo la clase en tiempo real">
-              <Users size={15} color="#4f46e5" />
-              <span>
-                <strong>{spectatorCount}</strong> {spectatorCount === 1 ? 'Estudiante' : 'Estudiantes'}
-              </span>
-            </div>
+            <>
+              <div className="spectator-counter-badge" title="Estudiantes activos viendo la clase en tiempo real">
+                <Users size={15} color="#4f46e5" />
+                <span>
+                  <strong>{spectatorCount}</strong> {spectatorCount === 1 ? 'Estudiante' : 'Estudiantes'}
+                </span>
+              </div>
+
+              {wsConnected !== undefined && (
+                <div
+                  className="spectator-counter-badge"
+                  title={
+                    wsConnected
+                      ? 'Conexión WebSocket estable'
+                      : wsReconnecting
+                        ? 'Reconectando al servidor...'
+                        : 'Desconectado del servidor'
+                  }
+                  style={{
+                    gap: '4px',
+                    fontSize: '0.7rem',
+                    background: wsConnected
+                      ? 'rgba(16, 185, 129, 0.08)'
+                      : wsReconnecting
+                        ? 'rgba(245, 158, 11, 0.1)'
+                        : 'rgba(239, 68, 68, 0.08)'
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '7px',
+                      height: '7px',
+                      borderRadius: '50%',
+                      background: wsConnected ? '#10b981' : wsReconnecting ? '#f59e0b' : '#ef4444',
+                      display: 'inline-block'
+                    }}
+                  />
+                  <span>
+                    {wsConnected ? 'Conectado' : wsReconnecting ? 'Reconectando…' : 'Desconectado'}
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

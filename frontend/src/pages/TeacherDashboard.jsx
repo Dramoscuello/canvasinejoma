@@ -18,6 +18,8 @@ export default function TeacherDashboard() {
   const [showStartModal, setShowStartModal] = useState(true);
   const [spectatorCount, setSpectatorCount] = useState(0);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [wsReconnecting, setWsReconnecting] = useState(false);
 
   // Estado para Diálogos Personalizados (Reemplazo de alert y confirm)
   const [dialog, setDialog] = useState({
@@ -59,7 +61,7 @@ export default function TeacherDashboard() {
       }
     }
 
-    // Restaurar clase activa únicamente si existe una clase EN VIVO sin finalizar
+    // Restaurar clase activa únicamente si existe una clase EN VIVO activa sin finalizar
     const activeSession = localStorage.getItem('canva_active_session');
     if (activeSession) {
       try {
@@ -79,16 +81,34 @@ export default function TeacherDashboard() {
               canvasRef.current.loadRemoteJSON(parsed.canvasData);
             }
           }, 350);
+          return;
         }
       } catch (e) {
         console.error('Error restaurando sesión activa:', e);
       }
     }
+
+    // Si NO hay sesión activa abierta (showStartModal es true), limpiar lienzo completamente
+    setShowStartModal(true);
+    setIsActive(false);
+    setRoomCode(null);
+    setSessionTitle('');
+    setTimeout(() => {
+      if (canvasRef.current && canvasRef.current.clearAll) {
+        canvasRef.current.clearAll();
+      }
+    }, 200);
   }, [navigate]);
 
-  // Escuchar número de estudiantes conectados en tiempo real por WebSocket
+  // Escuchar mensajes del WebSocket: contador de espectadores y estado de conexión
   useEffect(() => {
     const unsubscribe = wsService.subscribe((message) => {
+      if (message.type === 'CONNECTION_STATUS') {
+        setWsConnected(message.connected);
+        setWsReconnecting(!!message.reconnecting);
+        return;
+      }
+
       if (message.type === 'SPECTATOR_COUNT' && typeof message.count === 'number') {
         setSpectatorCount(message.count);
       }
@@ -155,7 +175,7 @@ export default function TeacherDashboard() {
     );
   };
 
-  // Abrir Modal para Iniciar una Nueva Clase (Limpia el lienzo viejo)
+  // Abrir Modal para Iniciar una Nueva Clase (Elimina sesión activa previa y limpia lienzo)
   const handleStartNewClass = () => {
     localStorage.removeItem('canva_active_session');
     setSessionTitle('');
@@ -287,7 +307,7 @@ export default function TeacherDashboard() {
         setHistoryList(updatedHistory);
         localStorage.setItem('canva_history', JSON.stringify(updatedHistory));
 
-        // 3. Eliminar la sesión activa de localStorage
+        // 3. Eliminar la sesión activa de localStorage para que refrescar no reabra la sesión vieja
         localStorage.removeItem('canva_active_session');
 
         // 4. Desconectar WebSocket y resetear estado a inactivo
@@ -298,7 +318,7 @@ export default function TeacherDashboard() {
         setSpectatorCount(0);
         setShowStartModal(true);
 
-        // 5. Limpiar el lienzo
+        // 5. Limpiar el lienzo inmediatamente
         if (canvasRef.current && canvasRef.current.clearAll) {
           canvasRef.current.clearAll();
         }
@@ -334,6 +354,8 @@ export default function TeacherDashboard() {
         isActive={isActive}
         isTeacher={true}
         spectatorCount={spectatorCount}
+        wsConnected={wsConnected}
+        wsReconnecting={wsReconnecting}
         onSaveSession={handleSaveSession}
         onExportImage={handleExportImage}
         onFinishSession={handleFinishSession}
