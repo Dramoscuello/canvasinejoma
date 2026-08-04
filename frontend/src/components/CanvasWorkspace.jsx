@@ -7,6 +7,7 @@ const CanvasWorkspace = forwardRef(({
   brushSize,
   isTeacher,
   onCanvasChange,
+  onViewportChange,
   initialData,
   onZoomChange
 }, ref) => {
@@ -15,11 +16,16 @@ const CanvasWorkspace = forwardRef(({
   const fabricCanvasRef = useRef(null);
   const isSyncingRef = useRef(false);
 
-  // REF para evitar closure obsoleta del callback onCanvasChange
+  // REFs para evitar closure obsoleta de los callbacks
   const onCanvasChangeRef = useRef(onCanvasChange);
   useEffect(() => {
     onCanvasChangeRef.current = onCanvasChange;
   }, [onCanvasChange]);
+
+  const onViewportChangeRef = useRef(onViewportChange);
+  useEffect(() => {
+    onViewportChangeRef.current = onViewportChange;
+  }, [onViewportChange]);
 
   // Estado para el cursor borrador visual circular
   const [eraserCursor, setEraserCursor] = useState({ x: 0, y: 0, visible: false });
@@ -29,11 +35,25 @@ const CanvasWorkspace = forwardRef(({
     if (!isTeacher || isSyncingRef.current || !fabricCanvasRef.current) return;
     try {
       const json = fabricCanvasRef.current.toJSON();
+      const vt = fabricCanvasRef.current.viewportTransform;
       if (onCanvasChangeRef.current) {
-        onCanvasChangeRef.current(json);
+        onCanvasChangeRef.current(json, vt);
       }
     } catch (e) {
       console.error('Error emitiendo cambio de lienzo:', e);
+    }
+  }, [isTeacher]);
+
+  // Función para emitir solo cambio de viewport (pan/zoom sin dibujar)
+  const emitViewport = useCallback(() => {
+    if (!isTeacher || !fabricCanvasRef.current) return;
+    try {
+      const vt = fabricCanvasRef.current.viewportTransform;
+      if (onViewportChangeRef.current) {
+        onViewportChangeRef.current(vt);
+      }
+    } catch (e) {
+      console.error('Error emitiendo viewport:', e);
     }
   }, [isTeacher]);
 
@@ -82,44 +102,48 @@ const CanvasWorkspace = forwardRef(({
     };
     window.addEventListener('resize', handleResize);
 
-    // --- ARRASTRE NATIVO DEL LIENZO (PANNING CON relativePan) ---
+    // --- ARRASTRE NATIVO DEL LIENZO (PANNING CON relativePan) --- SOLO PROFESOR
     let isPanning = false;
     let lastPosX = 0;
     let lastPosY = 0;
 
-    canvas.on('mouse:down', (opt) => {
-      const evt = opt.e;
-      // Iniciar panning si se presiona la tecla Alt, Espacio o clic en fondo vacío en modo selección
-      if (evt.altKey || evt.shiftKey || (activeTool === 'select' && !opt.target)) {
-        isPanning = true;
-        canvas.selection = false;
-        lastPosX = evt.clientX;
-        lastPosY = evt.clientY;
-        canvas.defaultCursor = 'grabbing';
-      }
-    });
-
-    canvas.on('mouse:move', (opt) => {
-      if (isPanning && fabricCanvasRef.current) {
+    if (isTeacher) {
+      canvas.on('mouse:down', (opt) => {
         const evt = opt.e;
-        const delta = new fabric.Point(evt.clientX - lastPosX, evt.clientY - lastPosY);
-        fabricCanvasRef.current.relativePan(delta);
-        lastPosX = evt.clientX;
-        lastPosY = evt.clientY;
-      }
-    });
-
-    canvas.on('mouse:up', () => {
-      if (isPanning) {
-        isPanning = false;
-        if (fabricCanvasRef.current) {
-          fabricCanvasRef.current.defaultCursor = activeTool === 'select' ? 'grab' : 'default';
-          if (activeTool === 'select' && isTeacher) {
-            fabricCanvasRef.current.selection = true;
-          }
+        // Iniciar panning si se presiona la tecla Alt, Espacio o clic en fondo vacío en modo selección
+        if (evt.altKey || evt.shiftKey || (activeTool === 'select' && !opt.target)) {
+          isPanning = true;
+          canvas.selection = false;
+          lastPosX = evt.clientX;
+          lastPosY = evt.clientY;
+          canvas.defaultCursor = 'grabbing';
         }
-      }
-    });
+      });
+
+      canvas.on('mouse:move', (opt) => {
+        if (isPanning && fabricCanvasRef.current) {
+          const evt = opt.e;
+          const delta = new fabric.Point(evt.clientX - lastPosX, evt.clientY - lastPosY);
+          fabricCanvasRef.current.relativePan(delta);
+          lastPosX = evt.clientX;
+          lastPosY = evt.clientY;
+        }
+      });
+
+      canvas.on('mouse:up', () => {
+        if (isPanning) {
+          isPanning = false;
+          if (fabricCanvasRef.current) {
+            fabricCanvasRef.current.defaultCursor = activeTool === 'select' ? 'grab' : 'default';
+            if (activeTool === 'select') {
+              fabricCanvasRef.current.selection = true;
+            }
+          }
+          // Emitir viewport al terminar de arrastrar
+          emitViewport();
+        }
+      });
+    }
 
     // Transmitir cambios en tiempo real usando emitChange (referencia estable)
     canvas.on('object:added', emitChange);
@@ -127,22 +151,26 @@ const CanvasWorkspace = forwardRef(({
     canvas.on('object:removed', emitChange);
     canvas.on('path:created', emitChange);
 
-    // Zoom con la rueda del ratón
-    canvas.on('mouse:wheel', (opt) => {
-      try {
-        const delta = opt.e.deltaY;
-        let zoom = canvas.getZoom();
-        zoom *= 0.999 ** delta;
-        if (zoom > 5) zoom = 5;
-        if (zoom < 0.2) zoom = 0.2;
-        canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
-        opt.e.preventDefault();
-        opt.e.stopPropagation();
-        if (onZoomChange) onZoomChange(zoom);
-      } catch (e) {
-        console.warn('Error en zoom:', e);
-      }
-    });
+    // Zoom con la rueda del ratón (SOLO PROFESOR)
+    if (isTeacher) {
+      canvas.on('mouse:wheel', (opt) => {
+        try {
+          const delta = opt.e.deltaY;
+          let zoom = canvas.getZoom();
+          zoom *= 0.999 ** delta;
+          if (zoom > 5) zoom = 5;
+          if (zoom < 0.2) zoom = 0.2;
+          canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+          opt.e.preventDefault();
+          opt.e.stopPropagation();
+          if (onZoomChange) onZoomChange(zoom);
+          // Emitir viewport al cambiar zoom
+          emitViewport();
+        } catch (e) {
+          console.warn('Error en zoom:', e);
+        }
+      });
+    }
 
     if (initialData) {
       isSyncingRef.current = true;
@@ -421,6 +449,17 @@ const CanvasWorkspace = forwardRef(({
 
     toJSON: () => {
       return fabricCanvasRef.current?.toJSON();
+    },
+
+    applyViewportTransform: (vt) => {
+      const canvas = fabricCanvasRef.current;
+      if (!canvas || !vt || !Array.isArray(vt)) return;
+      try {
+        canvas.setViewportTransform(vt);
+        canvas.renderAll();
+      } catch (err) {
+        console.warn('Error aplicando viewport transform:', err);
+      }
     }
   }));
 

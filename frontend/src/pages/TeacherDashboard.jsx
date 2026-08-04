@@ -95,10 +95,17 @@ export default function TeacherDashboard() {
     wsService.connect(code, true);
   };
 
-  // Transmitir Cambios en el Canvas por WebSocket
-  const handleCanvasChange = (canvasJSON) => {
+  // Transmitir Cambios en el Canvas por WebSocket (incluye viewport)
+  const handleCanvasChange = (canvasJSON, viewportTransform) => {
     if (roomCode && isActive) {
-      wsService.sendCanvasUpdate(canvasJSON);
+      wsService.sendCanvasUpdate(canvasJSON, viewportTransform);
+    }
+  };
+
+  // Transmitir solo el Viewport (pan/zoom sin dibujar) por WebSocket
+  const handleViewportChange = (viewportTransform) => {
+    if (roomCode && isActive) {
+      wsService.sendViewportUpdate(viewportTransform);
     }
   };
 
@@ -180,6 +187,7 @@ export default function TeacherDashboard() {
         brushSize={brushSize}
         isTeacher={true}
         onCanvasChange={handleCanvasChange}
+        onViewportChange={handleViewportChange}
         onZoomChange={setZoomLevel}
         ref={canvasRef}
       />

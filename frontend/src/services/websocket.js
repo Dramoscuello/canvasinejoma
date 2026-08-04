@@ -57,11 +57,12 @@ class WebSocketService {
     }
   }
 
-  sendCanvasUpdate(canvasJSON) {
+  sendCanvasUpdate(canvasJSON, viewportTransform) {
     const payload = {
       type: 'CANVAS_UPDATE',
       roomCode: this.roomCode,
       data: canvasJSON,
+      viewport: viewportTransform || null,
       timestamp: Date.now()
     };
 
@@ -71,6 +72,23 @@ class WebSocketService {
     }
 
     // Enviar por WebSocket si está abierto
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(payload));
+    }
+  }
+
+  sendViewportUpdate(viewportTransform) {
+    const payload = {
+      type: 'VIEWPORT_UPDATE',
+      roomCode: this.roomCode,
+      viewport: viewportTransform,
+      timestamp: Date.now()
+    };
+
+    if (this.mockBroadcastChannel) {
+      this.mockBroadcastChannel.postMessage(payload);
+    }
+
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(payload));
     }

@@ -18,11 +18,20 @@ export default function StudentView() {
     // Conectar WebSocket como Estudiante (Solo Lectura)
     wsService.connect(code, false);
 
-    // Escuchar actualizaciones del lienzo desde el profesor
+    // Escuchar actualizaciones del lienzo y viewport desde el profesor
     const unsubscribe = wsService.subscribe((message) => {
       if (message.type === 'CANVAS_UPDATE' && message.data) {
         if (canvasRef.current && canvasRef.current.loadRemoteJSON) {
           canvasRef.current.loadRemoteJSON(message.data);
+        }
+        // Aplicar viewport del profesor si viene incluido
+        if (message.viewport && canvasRef.current && canvasRef.current.applyViewportTransform) {
+          canvasRef.current.applyViewportTransform(message.viewport);
+        }
+      } else if (message.type === 'VIEWPORT_UPDATE' && message.viewport) {
+        // Sincronizar pan/zoom del profesor sin cambios en el dibujo
+        if (canvasRef.current && canvasRef.current.applyViewportTransform) {
+          canvasRef.current.applyViewportTransform(message.viewport);
         }
       } else if (message.type === 'SESSION_ENDED') {
         setIsActive(false);
