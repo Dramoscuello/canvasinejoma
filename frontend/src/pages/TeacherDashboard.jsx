@@ -42,12 +42,12 @@ export default function TeacherDashboard() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyList, setHistoryList] = useState([]);
   const canvasRef = useRef(null);
-  const isFinishingRef = useRef(false);
 
   // Verificar autenticación y restaurar sesión activa si se refrescó la página
   useEffect(() => {
     const token = localStorage.getItem('canva_admin_token');
     if (!token) {
+      localStorage.removeItem('canva_active_session');
       navigate('/login');
       return;
     }
@@ -122,7 +122,6 @@ export default function TeacherDashboard() {
 
   // Guardar estado de sesión activa en localStorage continuamente para resistir F5 / Refresco
   const persistActiveSessionState = (code, title, canvasData) => {
-    if (isFinishingRef.current) return;
     if (!code) return;
     const sessionState = {
       code,
@@ -172,6 +171,7 @@ export default function TeacherDashboard() {
       () => {
         localStorage.removeItem('canva_admin_token');
         localStorage.removeItem('canva_admin_user');
+        localStorage.removeItem('canva_active_session');
         wsService.disconnect();
         navigate('/login');
       },
@@ -283,13 +283,14 @@ export default function TeacherDashboard() {
       '¿Finalizar la Clase Actual?',
       'Al finalizar la clase, el código de 4 caracteres quedará inhabilitado para los estudiantes.',
       async () => {
-        isFinishingRef.current = true;
-
         const currentCode = roomCode;
         const currentTitle = sessionTitle;
         const canvasData = canvasRef.current?.toJSON?.();
 
-        // 1. Notificar al Backend para marcar la sesión como inactiva
+        // 1. Eliminar sesión activa YA (previene que eventos de canvas la re-escriban)
+        localStorage.removeItem('canva_active_session');
+
+        // 2. Notificar al Backend para marcar la sesión como inactiva
         if (currentCode) {
           try {
             await fetch(`/api/sessions/${currentCode}/finish`, { method: 'POST' });
@@ -298,7 +299,7 @@ export default function TeacherDashboard() {
           }
         }
 
-        // 2. Guardar en el Historial marcado como FINALIZADO (is_active: false)
+        // 3. Guardar en el Historial marcado como FINALIZADO (is_active: false)
         const finishedRecord = {
           id: Date.now().toString(),
           title: currentTitle,
@@ -313,9 +314,6 @@ export default function TeacherDashboard() {
         setHistoryList(updatedHistory);
         localStorage.setItem('canva_history', JSON.stringify(updatedHistory));
 
-        // 3. Eliminar la sesión activa de localStorage para que refrescar no reabra la sesión vieja
-        localStorage.removeItem('canva_active_session');
-
         // 4. Desconectar WebSocket y resetear estado a inactivo
         wsService.disconnect();
         setRoomCode(null);
@@ -324,12 +322,13 @@ export default function TeacherDashboard() {
         setSpectatorCount(0);
         setShowStartModal(true);
 
-        // 5. Limpiar el lienzo inmediatamente
+        // 5. Limpiar el lienzo inmediatamente (dispara eventos Fabric que llaman a persistActiveSessionState)
         if (canvasRef.current && canvasRef.current.clearAll) {
           canvasRef.current.clearAll();
         }
 
-        isFinishingRef.current = false;
+        // 6. Segunda eliminación: por si clearAll disparó eventos que re-escribieron el localStorage
+        localStorage.removeItem('canva_active_session');
 
         showAlert('Sesión Finalizada', 'La clase ha finalizado exitosamente. El código de acceso ha quedado inhabilitado.', 'info');
       },
